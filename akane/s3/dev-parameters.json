@@ -1,0 +1,20 @@
+{
+    "Parameters": [
+        {
+            "ParameterKey": "SystemName",
+            "ParameterValue": "akane"
+        },
+        {
+            "ParameterKey": "EnvType",
+            "ParameterValue": "dev"
+        },
+        {
+            "ParameterKey": "AppS3Bucket",
+            "ParameterValue": "akane-dev-s3-react"
+        },
+        {
+            "ParameterKey": "AppIndexDocument",
+            "ParameterValue": "index.html"
+        }
+    ]
+}
