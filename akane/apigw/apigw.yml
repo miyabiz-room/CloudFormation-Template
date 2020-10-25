@@ -1,0 +1,212 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: API Gateway For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+  EnvTypeCommon:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+  APIPathPart:
+    Type: String
+  APIGatewayStage:
+    Type: String
+
+# Mappings
+
+# Conditions
+
+# Transform
+
+Resources:
+  # ApiGateway CloudWatchRole 作成
+  akaneCloudWatchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      Description: !Sub
+        - ${SystemName}-${EnvTypeCommon}-role-apigw-cloudwatch-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvTypeCommon: !Ref EnvTypeCommon}
+      ManagedPolicyArns:
+        -  arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+      Path: /
+      RoleName: !Sub
+        - ${SystemName}-${EnvTypeCommon}-role-apigw-cloudwatch-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvTypeCommon: !Ref EnvTypeCommon}
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvTypeCommon}-role-apigw-cloudwatch-${AWS::Region}
+          - {SystemName: !Ref SystemName, EnvTypeCommon: !Ref EnvTypeCommon}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvTypeCommon
+          Value: !Ref EnvTypeCommon
+  akaneApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt akaneCloudWatchRole.Arn
+
+  # ApiGateway 作成
+  akaneApiGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    DependsOn: akaneApiGatewayAccount
+    Properties:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-apigw
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Description: !Sub
+        - ${SystemName}-${EnvType}-apigw
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-apigw
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+  akaneApiGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref akaneApiGatewayRestApi
+      ParentId: !GetAtt akaneApiGatewayRestApi.RootResourceId
+      PathPart: !Ref APIPathPart
+  akaneApiGatewayResourceMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref akaneApiGatewayRestApi
+      ResourceId: !Ref akaneApiGatewayResource
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Join
+          - ''
+          - - 'arn:aws:apigateway:'
+            - !Ref AWS::Region
+            - ':lambda:path/2015-03-31/functions/'
+            - Fn::ImportValue: !Sub
+              - ${SystemName}-${EnvType}-lambda-arn
+              - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+            - '/invocations'
+
+  # ApiGateway LambdaPermission 作成
+  akaneApiGatewayLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Fn::ImportValue: !Sub
+          - ${SystemName}-${EnvType}-lambda
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+
+  # ApiGateway Deployment 作成
+  akaneApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: akaneApiGatewayResourceMethod
+    Properties:
+      Description: !Sub
+        - ${SystemName}-${EnvType}-apigw-deployment
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      RestApiId: !Ref akaneApiGatewayRestApi
+  akaneApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref akaneApiGatewayDeployment
+      Description: !Sub
+        - ${SystemName}-${EnvType}-apigw-stage
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      MethodSettings:
+        - CacheDataEncrypted: false
+          CachingEnabled: false
+          DataTraceEnabled: true # CloudWatch ログを有効化
+          HttpMethod: '*'
+          LoggingLevel: ERROR
+          MetricsEnabled: false # 詳細 CloudWatch メトリクスを有効化
+          ResourcePath: '/*'
+      RestApiId: !Ref akaneApiGatewayRestApi
+      StageName: !Ref APIGatewayStage
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-apigw-stage
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+      TracingEnabled: false # X-Ray トレースの有効化
+
+  # ApiGateway APIキー 作成
+  akaneApiGatewayKey:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-apigw-key
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Description: !Sub
+        - ${SystemName}-${EnvType}-apigw-key
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Enabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-apigw-key
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+  akaneApiGatewayUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    DependsOn: akaneApiGatewayStage
+    Properties:
+      ApiStages:
+        - ApiId: !Ref akaneApiGatewayRestApi
+          Stage: !Ref APIGatewayStage
+      Description: !Sub
+        - ${SystemName}-${EnvType}-apigw-usage-plan
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      UsagePlanName: !Sub
+        - ${SystemName}-${EnvType}-apigw-usage-plan
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-apigw-usage-plan
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+  akaneApiGatewayUsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref akaneApiGatewayKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref akaneApiGatewayUsagePlan
