@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: S3 For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+  BucketName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+
+# Mappings
+
+# Conditions
+
+# Transform
+
+Resources:
+  # バケット作成
+  akaneS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub
+      - ${SystemName}-${EnvType}-${BucketName}
+      - {SystemName: !Ref SystemName, EnvType: !Ref EnvType, BucketName: !Ref BucketName}
+      AccessControl: Private
+      # BucketEncryption:
+      #   ServerSideEncryptionConfiguration:
+      #     - ServerSideEncryptionByDefault:
+      #         SSEAlgorithm: AES256
+      Tags:
+      - Key: Name
+        Value: !Sub
+        - ${SystemName}-${EnvType}-s3
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      - Key: SystemName
+        Value: !Ref SystemName
+      - Key: EnvType
+        Value: !Ref EnvType
+  # バケットポリシー作成
+  akaneS3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref akaneS3Bucket
+      PolicyDocument:
+        Statement:
+          - Sid: !Sub
+              - ${SystemName}-${EnvType}-${BucketName}
+              - {SystemName: !Ref SystemName, EnvType: !Ref EnvType, BucketName: !Ref BucketName}
+            Action: 
+              - s3:ListBucket
+              - s3:GetObject
+              - s3:PutObject
+            Effect: Allow
+            Resource: 
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref akaneS3Bucket
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref akaneS3Bucket
+                  - /*
+            Principal: '*'
+  # VPCエンドポイント作成
+  akaneS3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+              - s3:*
+            Resource:
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref akaneS3Bucket
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref akaneS3Bucket
+                  - /*
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::*'
+                  - !Ref AWS::Region
+                  - '.amazon.com/*'
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::*'
+                  - !Ref AWS::Region
+                  - '.amazon.com'
+      RouteTableIds:
+        - Fn::ImportValue: !Sub
+          - ${SystemName}-${EnvType}-public-route-table
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Fn::ImportValue: !Sub
+          - ${SystemName}-${EnvType}-private-route-table
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcId:
+        Fn::ImportValue: !Sub
+          - ${SystemName}-${EnvType}-vpc
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+
+Outputs:
+  akaneS3Bucket:
+    Value: !Ref akaneS3Bucket
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-bucket
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
