@@ -1,0 +1,141 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: S3 For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+  IsFirstTime:
+    Type: String
+    AllowedValues: [true, false]
+
+Mappings:
+  AnotherAz:
+    ap-northeast-1:
+      Region: ap-northeast-3
+    ap-northeast-3:
+      Region: ap-northeast-1
+
+Conditions:
+  IsFirstTime: !Not [ !Equals [ !Ref IsFirstTime, true ] ]
+
+# Transform
+
+Resources:
+  # ロール作成
+  akaneS3ReplicationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - s3.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Description: !Sub
+        - ${SystemName}-${EnvType}-role-s3-replication-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Path: /
+      Policies:
+        - PolicyName: !Sub
+            - ${SystemName}-${EnvType}-policy-s3-replication-${AWS::Region}
+            - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:Get*
+                  - s3:ListBucket
+                Resource:
+                  - !Join
+                    - ''
+                    - - 'arn:aws:s3:::'
+                      - !Sub
+                        - ${SystemName}-${EnvType}-s3-${AWS::Region}
+                        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+                  - !Join
+                    - ''
+                    - - 'arn:aws:s3:::'
+                      - !Sub
+                        - ${SystemName}-${EnvType}-s3-${AWS::Region}
+                        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+                      - /*
+              - Effect: Allow
+                Action:
+                  - s3:ReplicateObject
+                  - s3:ReplicateDelete
+                  - s3:ReplicateTags
+                  - s3:GetObjectVersionTagging
+                Resource:
+                  - !Join
+                    - ''
+                    - - 'arn:aws:s3:::'
+                      - !Sub
+                        - ${SystemName}-${EnvType}-s3-
+                        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+                      - !FindInMap [AnotherAz, !Ref AWS::Region, Region]
+                      - /*
+      RoleName: !Sub
+        - ${SystemName}-${EnvType}-role-s3-replication-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-role-s3-replication-${AWS::Region}
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+  # S3 Bucket作成
+  akaneS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketName: !Sub
+        - ${SystemName}-${EnvType}-s3-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      VersioningConfiguration:
+        Status: Enabled
+      ReplicationConfiguration: !If
+        - IsFirstTime
+        - Role: !GetAtt akaneS3ReplicationRole.Arn
+          Rules:
+            - Destination:
+                Bucket: !Join
+                  - ''
+                  - - !Sub arn:aws:s3:::${SystemName}-${EnvType}-s3-
+                    - !FindInMap [AnotherAz, !Ref AWS::Region, Region]
+              Id: ClossRegionSync
+              Prefix: ''
+              Status: Enabled
+        - !Ref AWS::NoValue
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - ${SystemName}-${EnvType}-s3-${AWS::Region}
+            - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+Outputs:
+  akaneS3BucketArn:
+    Value: !GetAtt akaneS3Bucket.Arn
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-s3-arn-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}

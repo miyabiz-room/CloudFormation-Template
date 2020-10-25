@@ -1,0 +1,19 @@
+{
+    "Parameters": [
+        {
+            "ParameterKey": "SystemName",
+            "ParameterValue": "akane"
+        },
+        {
+            "ParameterKey": "EnvType",
+            "ParameterValue": "dev"
+        },
+        {
+            "ParameterKey": "IsFirstTime",
+            "ParameterValue": "true"
+        }
+    ],
+    "Capabilities": [
+        "CAPABILITY_NAMED_IAM"
+    ]
+}
