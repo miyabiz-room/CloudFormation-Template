@@ -1,0 +1,136 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Macro For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+
+# Mappings
+
+# Conditions
+
+# Transform
+
+Resources:
+  # ロール作成
+  akaneRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Description: !Sub
+        - ${SystemName}-${EnvType}-role-macro
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Path: /
+      RoleName: !Sub
+        - ${SystemName}-${EnvType}-role-macro
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:*
+                Resource: arn:aws:logs:*:*:*
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-role-macro
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+  # Lambda作成
+  akaneLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import traceback
+          def handler(event, context):
+              response = {
+                  "requestId": event["requestId"],
+                  "status": "success"
+              }
+              try:
+                  operation = event["params"]["Operation"]
+                  input = event["params"]["InputString"]
+                  no_param_string_funcs = ["Upper", "Lower", "Capitalize", "Title", "SwapCase"]
+                  if operation in no_param_string_funcs:
+                      response["fragment"] = getattr(input, operation.lower())()
+                  elif operation == "Strip":
+                      chars = None
+                      if "Chars" in event["params"]:
+                          chars = event["params"]["Chars"]
+                      response["fragment"] = input.strip(chars)
+                  elif operation == "Replace":
+                      old = event["params"]["Old"]
+                      new = event["params"]["New"]
+                      response["fragment"] = input.replace(old, new)
+                  elif operation == "MaxLength":
+                      length = int(event["params"]["Length"])
+                      if len(input) <= length:
+                          response["fragment"] = input
+                      elif "StripFrom" in event["params"]:
+                          if event["params"]["StripFrom"] == "Left":
+                              response["fragment"] = input[len(input)-length:]
+                          elif event["params"]["StripFrom"] != "Right":
+                              response["status"] = "failure"
+                      else:
+                          response["fragment"] = input[:length]
+                  else:
+                      response["status"] = "failure"
+              except Exception as e:
+                  traceback.print_exc()
+                  response["status"] = "failure"
+                  response["errorMessage"] = str(e)
+              return response
+      FunctionName: !Sub
+        - ${SystemName}-${EnvType}-macro-lambda
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Handler: index.handler
+      Runtime: python3.7
+      Role: !GetAtt akaneRole.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-macro-lambda
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+  # LambdaPermission作成
+  akaneLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref akaneLambdaFunction
+      Principal: cloudformation.amazonaws.com
+  # Macro作成
+  akaneCloudFormationMacro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Name: convertString
+      Description: Provides various string processing functions
+      FunctionName: !Ref akaneLambdaFunction
+
+# Outputs

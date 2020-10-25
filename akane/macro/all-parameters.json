@@ -1,0 +1,15 @@
+{
+    "Parameters": [
+        {
+            "ParameterKey": "SystemName",
+            "ParameterValue": "akane"
+        },
+        {
+            "ParameterKey": "EnvType",
+            "ParameterValue": "all"
+        }
+    ],
+    "Capabilities": [
+        "CAPABILITY_NAMED_IAM"
+    ]
+}

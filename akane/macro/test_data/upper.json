@@ -1,0 +1,7 @@
+{
+    "requestId": "test",
+    "params": {
+        "InputString": "abcde",
+        "Operation": "Upper"
+    }
+}
