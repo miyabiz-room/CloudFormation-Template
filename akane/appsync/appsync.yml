@@ -1,0 +1,327 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: AppSync For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+
+# Mappings
+
+# Conditions
+
+# Transform
+
+Resources:
+  # ロール作成
+  akaneRoleForAppSync:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - appsync.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Description: !Sub
+        - ${SystemName}-${EnvType}-role-appsync-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Path: /
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Resource:
+                  - !Join
+                    - ''
+                    - - 'arn:aws:dynamodb:'
+                      - !Ref AWS::Region
+                      - ':'
+                      - !Ref AWS::AccountId
+                      - ':table/'
+                      - Fn::ImportValue: !Sub
+                        - ${SystemName}-${EnvType}-dynamodb
+                        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+                  - !Join
+                    - ''
+                    - - 'arn:aws:dynamodb:'
+                      - !Ref AWS::Region
+                      - ':'
+                      - !Ref AWS::AccountId
+                      - ':table/'
+                      - Fn::ImportValue: !Sub
+                        - ${SystemName}-${EnvType}-dynamodb
+                        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+                      - '/*'
+                Action:
+                  - dynamodb:BatchGetItem
+                  - dynamodb:BatchWriteItem
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:GetItem
+                  - dynamodb:Scan
+                  - dynamodb:Query
+                  - dynamodb:UpdateItem
+      RoleName: !Sub
+        - ${SystemName}-${EnvType}-role-appsync-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-role-appsync-${AWS::Region}
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+  akaneAppSyncGraphQLApi:
+    Type: AWS::AppSync::GraphQLApi
+    Properties:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-appsync-graphql-api
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      AuthenticationType: AMAZON_COGNITO_USER_POOLS
+      UserPoolConfig:
+        UserPoolId:
+          Fn::ImportValue: !Sub
+            - ${SystemName}-${EnvType}-cognito-user-pool
+            - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        AwsRegion: !Ref AWS::Region
+        DefaultAction: ALLOW
+      XrayEnabled: false
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-role-appsync-${AWS::Region}
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+  akaneAppSyncDataSourceForDynamoDB:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      Name: !Sub
+        - ${SystemName}_${EnvType}_AppSyncDataSourceDynamoDB
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Type: AMAZON_DYNAMODB
+      ServiceRoleArn: !GetAtt akaneRoleForAppSync.Arn
+      DynamoDBConfig:
+        TableName:
+          Fn::ImportValue: !Sub
+            - ${SystemName}-${EnvType}-dynamodb
+            - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        AwsRegion: !Ref AWS::Region
+        UseCallerCredentials: false
+        Versioned: false
+      ApiId: !GetAtt akaneAppSyncGraphQLApi.ApiId
+
+  akaneAppSyncDataSourceForNone:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      Name: !Sub
+        - ${SystemName}_${EnvType}_AppSyncDataSourceNone
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Type: NONE
+      ApiId: !GetAtt akaneAppSyncGraphQLApi.ApiId
+
+  akaneAppSyncGraphQLSchema:
+    Type: AWS::AppSync::GraphQLSchema
+    Properties:
+      ApiId: !GetAtt akaneAppSyncGraphQLApi.ApiId
+      Definition: |
+        input CreateTodoInput {
+          id: ID
+          note: String!
+        }
+
+        input DeleteTodoInput {
+          id: ID!
+        }
+
+        enum ModelAttributeTypes {
+          binary
+          binarySet
+          bool
+          list
+          map
+          number
+          numberSet
+          string
+          stringSet
+          _null
+        }
+
+        input ModelBooleanInput {
+          ne: Boolean
+          eq: Boolean
+          attributeExists: Boolean
+          attributeType: ModelAttributeTypes
+        }
+
+        input ModelFloatInput {
+          ne: Float
+          eq: Float
+          le: Float
+          lt: Float
+          ge: Float
+          gt: Float
+          between: [Float]
+          attributeExists: Boolean
+          attributeType: ModelAttributeTypes
+        }
+
+        input ModelIDInput {
+          ne: ID
+          eq: ID
+          le: ID
+          lt: ID
+          ge: ID
+          gt: ID
+          contains: ID
+          notContains: ID
+          between: [ID]
+          beginsWith: ID
+          attributeExists: Boolean
+          attributeType: ModelAttributeTypes
+          size: ModelSizeInput
+        }
+
+        input ModelIntInput {
+          ne: Int
+          eq: Int
+          le: Int
+          lt: Int
+          ge: Int
+          gt: Int
+          between: [Int]
+          attributeExists: Boolean
+          attributeType: ModelAttributeTypes
+        }
+
+        input ModelSizeInput {
+          ne: Int
+          eq: Int
+          le: Int
+          lt: Int
+          ge: Int
+          gt: Int
+          between: [Int]
+        }
+
+        enum ModelSortDirection {
+          ASC
+          DESC
+        }
+
+        input ModelStringInput {
+          ne: String
+          eq: String
+          le: String
+          lt: String
+          ge: String
+          gt: String
+          contains: String
+          notContains: String
+          between: [String]
+          beginsWith: String
+          attributeExists: Boolean
+          attributeType: ModelAttributeTypes
+          size: ModelSizeInput
+        }
+
+        input ModelTodoConditionInput {
+          note: ModelStringInput
+          and: [ModelTodoConditionInput]
+          or: [ModelTodoConditionInput]
+          not: ModelTodoConditionInput
+        }
+
+        type ModelTodoConnection {
+          items: [Todo]
+          nextToken: String
+        }
+
+        input ModelTodoFilterInput {
+          id: ModelIDInput
+          note: ModelStringInput
+          and: [ModelTodoFilterInput]
+          or: [ModelTodoFilterInput]
+          not: ModelTodoFilterInput
+        }
+
+        type Mutation {
+          createTodo(input: CreateTodoInput!, condition: ModelTodoConditionInput): Todo
+          updateTodo(input: UpdateTodoInput!, condition: ModelTodoConditionInput): Todo
+          deleteTodo(input: DeleteTodoInput!, condition: ModelTodoConditionInput): Todo
+        }
+
+        type Query {
+          getTodo(id: ID!): Todo
+          listTodos(filter: ModelTodoFilterInput, limit: Int, nextToken: String): ModelTodoConnection
+        }
+
+        type Subscription {
+          onCreateTodo(owner: String!): Todo
+            @aws_subscribe(mutations: ["createTodo"])
+          onUpdateTodo(owner: String!): Todo
+            @aws_subscribe(mutations: ["updateTodo"])
+          onDeleteTodo(owner: String!): Todo
+            @aws_subscribe(mutations: ["deleteTodo"])
+        }
+
+        type Todo {
+          id: ID!
+          note: String!
+          createdAt: AWSDateTime!
+          updatedAt: AWSDateTime!
+          owner: String
+        }
+
+        input UpdateTodoInput {
+          id: ID!
+          note: String
+        }
+
+Outputs:
+  akaneAppSyncGraphQLApiApiId:
+    Value: !GetAtt akaneAppSyncGraphQLApi.ApiId
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-appsync-graphql-api-id
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+
+  akaneAppSyncGraphQLApiUrl:
+    Value: !GetAtt akaneAppSyncGraphQLApi.GraphQLUrl
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-appsync-graphql-api-url
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+
+  akaneAppSyncDataSourceForDynamoDBName:
+    Value: !GetAtt akaneAppSyncDataSourceForDynamoDB.Name
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-appsync-data-source-dynamodb
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+
+  akaneAppSyncDataSourceForNoneName:
+    Value: !GetAtt akaneAppSyncDataSourceForNone.Name
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-appsync-data-source-none
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}

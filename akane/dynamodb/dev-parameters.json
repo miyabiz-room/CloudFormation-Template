@@ -1,0 +1,16 @@
+{
+    "Parameters": [
+        {
+            "ParameterKey": "SystemName",
+            "ParameterValue": "akane"
+        },
+        {
+            "ParameterKey": "EnvType",
+            "ParameterValue": "dev"
+        },
+        {
+            "ParameterKey": "DynamoDBTableName",
+            "ParameterValue": "Todo"
+        }
+    ]
+}

@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Dynamo DB For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+  DynamoDBTableName:
+    Type: String
+
+# Mappings
+
+# Conditions
+
+# Transform
+
+Resources:
+  akaneDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: 'id'
+          AttributeType: 'S'
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: 'id'
+          KeyType: 'HASH'
+      StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+      TableName: !Sub
+        - ${SystemName}-${EnvType}-dynamodb-${DynamoDBTableName}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType, DynamoDBTableName: !Ref DynamoDBTableName}
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-dynamodb-${DynamoDBTableName}
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType, DynamoDBTableName: !Ref DynamoDBTableName}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+Outputs:
+  akaneDynamoDBTable:
+    Value: !Ref akaneDynamoDBTable
+    Export:
+      Name: !Sub
+          - ${SystemName}-${EnvType}-dynamodb
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}

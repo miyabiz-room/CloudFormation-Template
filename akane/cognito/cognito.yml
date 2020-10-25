@@ -1,0 +1,414 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Cognito For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+  RoleExternalId:
+    Type: String
+
+# Mappings
+
+# Conditions
+
+# Transform
+
+Resources:
+  # ロール作成
+  akaneRoleForCognitoSMS:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - cognito-idp.amazonaws.com
+            Action:
+              - sts:AssumeRole
+            Condition:
+              StringEquals:
+                'sts:ExternalId': !Ref RoleExternalId
+      Description: !Sub
+        - ${SystemName}-${EnvType}-role-cognito-idp-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Path: /
+      Policies:
+        - PolicyName: sns-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Resource: '*'
+                Action:
+                  - sns:Publish
+      RoleName: !Sub
+        - ${SystemName}-${EnvType}-role-cognito-idp-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-role-cognito-idp-${AWS::Region}
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+  akaneCognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub
+        - ${SystemName}-${EnvType}-cognito-user-pool
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: false
+          RequireLowercase: false
+          RequireNumbers: false
+          RequireSymbols: false
+          TemporaryPasswordValidityDays: 7
+      LambdaConfig: {}
+      Schema:
+        - Name: sub
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: false
+          Required: true
+          StringAttributeConstraints:
+            MinLength: 1
+            MaxLength: 2048
+        - Name: name
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: 0
+            MaxLength: 2048
+        - Name: given_name
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: 0
+            MaxLength: 2048
+        - Name: family_name
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: 0
+            MaxLength: 2048
+        - Name: middle_name
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: 0
+            MaxLength: 2048
+        - Name: nickname
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: 0
+            MaxLength: 2048
+        - Name: preferred_username
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: 0
+            MaxLength: 2048
+        - Name: profile
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: 0
+            MaxLength: 2048
+        - Name: picture
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: 0
+            MaxLength: 2048
+        - Name: website
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: 0
+            MaxLength: 2048
+        - Name: email
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: true
+          StringAttributeConstraints:
+            MinLength: 0
+            MaxLength: 2048
+        - Name: email_verified
+          AttributeDataType: Boolean
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+        - Name: gender
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: 0
+            MaxLength: 2048
+        - Name: birthdate
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: 10
+            MaxLength: 10
+        - Name: zoneinfo
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: 0
+            MaxLength: 2048
+        - Name: locale
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: 0
+            MaxLength: 2048
+        - Name: phone_number
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: 0
+            MaxLength: 2048
+        # - Name: phone_number_verified
+        #   AttributeDataType: Boolean
+        #   DeveloperOnlyAttribute: false
+        #   Mutable: true
+        #   Required: false
+        - Name: address
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: 0
+            MaxLength: 2048
+        - Name: updated_at
+          AttributeDataType: Number
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          NumberAttributeConstraints:
+            MinValue: 0
+      AutoVerifiedAttributes:
+        - 'email'
+      SmsVerificationMessage: 'Your verification code is {####}'
+      EmailVerificationMessage: 'Your verification code is {####}'
+      EmailVerificationSubject: 'Your verification code'
+      SmsAuthenticationMessage: 'Your authentication code is {####}'
+      MfaConfiguration: 'OFF'
+      EmailConfiguration:
+        EmailSendingAccount: COGNITO_DEFAULT
+      SmsConfiguration:
+        SnsCallerArn: !GetAtt akaneRoleForCognitoSMS.Arn
+        ExternalId: !Ref RoleExternalId
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: false
+      UserPoolTags:
+        Name: !Sub
+          - ${SystemName}-${EnvType}-cognito-user-pool
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        SystemName: !Ref SystemName
+        EnvType: !Ref EnvType
+      UsernameConfiguration:
+        CaseSensitive: false
+      VerificationMessageTemplate:
+        SmsMessage: 'Your verification code is {####}'
+        EmailMessage: 'Your verification code is {####}'
+        EmailSubject: 'Your verification code'
+        DefaultEmailOption: CONFIRM_WITH_CODE
+
+  akaneCognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref akaneCognitoUserPool
+      ClientName:  !Sub
+        - ${SystemName}-${EnvType}-cognito-user-pool-client
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      RefreshTokenValidity: 30
+      AllowedOAuthFlowsUserPoolClient: false
+      TokenValidityUnits: {}
+
+  akaneCognitoUserPoolClientWeb:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref akaneCognitoUserPool
+      ClientName: !Sub
+        - ${SystemName}-${EnvType}-cognito-user-pool-client-web
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      RefreshTokenValidity: 30
+      AllowedOAuthFlowsUserPoolClient: false
+      TokenValidityUnits: {}
+
+  akaneCognitoIdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      IdentityPoolName: !Sub
+        - ${SystemName}-${EnvType}-cognito-identity-pool
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      AllowUnauthenticatedIdentities: false
+      CognitoIdentityProviders:
+        - ProviderName: !Join
+          - ''
+          - - 'cognito-idp.'
+            - !Ref AWS::Region
+            - '.amazonaws.com/'
+            - !Ref akaneCognitoUserPool
+          ClientId: !Ref akaneCognitoUserPoolClient
+          ServerSideTokenCheck: false
+        - ProviderName: !Join
+          - ''
+          - - 'cognito-idp.'
+            - !Ref AWS::Region
+            - '.amazonaws.com/'
+            - !Ref akaneCognitoUserPool
+          ClientId: !Ref akaneCognitoUserPoolClientWeb
+          ServerSideTokenCheck: false
+
+  akaneRoleForAuth:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - cognito-idp.amazonaws.com
+            Action:
+              - sts:AssumeRole
+            Condition:
+              StringEquals:
+                'cognito-identity.amazonaws.com:aud': !Ref akaneCognitoIdentityPool
+              ForAnyValue:StringLike:
+                'cognito-identity.amazonaws.com:amr': 'authenticated'
+      Description: !Sub
+        - ${SystemName}-${EnvType}-role-cognito-idp-auth-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Path: /
+      RoleName: !Sub
+        - ${SystemName}-${EnvType}-role-cognito-idp-auth-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-role-cognito-idp-auth-${AWS::Region}
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+  akaneRoleForUnauth:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - cognito-idp.amazonaws.com
+            Action:
+              - sts:AssumeRole
+            Condition:
+              StringEquals:
+                'cognito-identity.amazonaws.com:aud': !Ref akaneCognitoIdentityPool
+              ForAnyValue:StringLike:
+                'cognito-identity.amazonaws.com:amr': 'unauthenticated'
+      Description: !Sub
+        - ${SystemName}-${EnvType}-role-cognito-idp-unauth-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Path: /
+      RoleName: !Sub
+        - ${SystemName}-${EnvType}-role-cognito-idp-unauth-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-role-cognito-idp-unauth-${AWS::Region}
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+  akaneCognitoIdentityPoolRoleAttachment:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId: !Ref akaneCognitoIdentityPool
+      Roles:
+        authenticated: !GetAtt akaneRoleForAuth.Arn
+        unauthenticated: !GetAtt akaneRoleForUnauth.Arn
+
+Outputs:
+  akaneCognitoUserPool:
+    Value: !Ref akaneCognitoUserPool
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-cognito-user-pool
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+
+  akaneCognitoIdentityPool:
+    Value: !Ref akaneCognitoIdentityPool
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-cognito-identity-pool
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+
+  akaneCognitoUserPoolClient:
+    Value: !Ref akaneCognitoUserPoolClient
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-cognito-user-pool-client
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+
+  akaneCognitoUserPoolClientWeb:
+    Value: !Ref akaneCognitoUserPoolClientWeb
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-cognito-user-pool-client-web
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
