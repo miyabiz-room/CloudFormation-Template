@@ -1,0 +1,180 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Instance For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+  ImageId:
+    Type: String
+    AllowedPattern: 'ami-[a-zA-Z0-9-]*'
+  InstanceType:
+    Type: String
+    AllowedPattern: '^[a-z][1-9][.][a-z0-9]+$'
+  KeyName:
+    Type: String
+
+Mappings: 
+  AzMap: 
+    ap-northeast-1:
+      1st: ap-northeast-1a
+      2nd: ap-northeast-1c
+      3rd: ap-northeast-1d
+
+# Conditions
+
+# Transform
+
+Resources:
+  # セキュリティグループ(EC2インスタンス)作成
+  akaneSecurityGroupInstance:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: !Sub
+        - ${SystemName}-${EnvType}-sg-instance
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      GroupName: !Sub
+        - ${SystemName}-${EnvType}-sg-instance
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress: 
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+      Tags: 
+        - Key: Name
+          Value: !Sub
+            - ${SystemName}-${EnvType}-sg-instance
+            - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+      VpcId:
+        Fn::ImportValue: !Sub
+          - ${SystemName}-${EnvType}-vpc
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+
+  # IAMロールを作成
+  akaneRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Description: !Sub
+        - ${SystemName}-${EnvType}-role
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      RoleName: !Sub
+        - ${SystemName}-${EnvType}-role
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Tags: 
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-role
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+  # インスタンスプロファイル作成
+  akaneInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+      - !Ref akaneRole
+
+  # EC2インスタンス作成
+  akaneInstance:
+    Type: AWS::EC2::Instance
+    Properties: 
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 1st]
+      DisableApiTermination: false
+      IamInstanceProfile:
+        !Ref akaneInstanceProfile      
+      ImageId: !Ref ImageId
+      InstanceInitiatedShutdownBehavior: stop
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      Monitoring: false
+      SecurityGroupIds: 
+        - !Ref akaneSecurityGroupInstance
+      SubnetId:
+        Fn::ImportValue: !Sub
+          - ${SystemName}-${EnvType}-public-subnet
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Tags: 
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-instance
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+      Tenancy: default
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install git -y
+
+          cd /home/ec2-user
+
+          # ec2-user bashrc設定
+          cat <<EOS | sudo tee -a /home/ec2-user/.bashrc
+          SERVERNAME=${SystemName}-${EnvType}
+          export PS1='\[\e[1;36m\][\e[1;33m\]\u@\[\e[1;32m\]\${!SERVERNAME} \w\[\e[1;36m\]]$\[\e[00m\] '
+          export AWS_DEFAULT_REGION=${AWS::Region}
+          EOS
+
+          # root bashrc設定
+          cat <<EOS | sudo tee /root/.bashrc
+          export PS1="\[\e[1;36m\][\u@\h \W]\$\[\e[00m\] "
+          EOS
+
+  # EIP作成およびEC2インスタンスへのアタッチ
+  akaneEIP:
+    Type: AWS::EC2::EIP
+    Properties: 
+      Domain: vpc
+      InstanceId: !Ref akaneInstance
+      Tags: 
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-eip
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+Outputs:
+  akaneSecurityGroupInstance:
+    Value: !Ref akaneSecurityGroupInstance
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-sg-instance
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}

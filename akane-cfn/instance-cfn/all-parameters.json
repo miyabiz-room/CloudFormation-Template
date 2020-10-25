@@ -1,0 +1,27 @@
+{
+    "Parameters": [
+        {
+            "ParameterKey": "SystemName",
+            "ParameterValue": "akane-cfn"
+        },
+        {
+            "ParameterKey": "EnvType",
+            "ParameterValue": "all"
+        },
+        {
+            "ParameterKey": "ImageId",
+            "ParameterValue": "ami-0ce107ae7af2e92b5"
+        },
+        {
+            "ParameterKey": "InstanceType",
+            "ParameterValue": "t2.micro"
+        },
+        {
+            "ParameterKey": "KeyName",
+            "ParameterValue": "akane"
+        }
+    ],
+    "Capabilities": [
+        "CAPABILITY_NAMED_IAM"
+    ]
+}

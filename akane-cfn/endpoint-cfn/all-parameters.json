@@ -1,0 +1,12 @@
+{
+    "Parameters": [
+        {
+            "ParameterKey": "SystemName",
+            "ParameterValue": "akane-cfn"
+        },
+        {
+            "ParameterKey": "EnvType",
+            "ParameterValue": "all"
+        }
+    ]
+}
