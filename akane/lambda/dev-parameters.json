@@ -1,0 +1,35 @@
+{
+    "Parameters": [
+        {
+            "ParameterKey": "SystemName",
+            "ParameterValue": "akane"
+        },
+        {
+            "ParameterKey": "EnvType",
+            "ParameterValue": "dev"
+        },
+        {
+            "ParameterKey": "ArtifactS3Bucket",
+            "ParameterValue": "akane-all-s3-artifacts"
+        },
+        {
+            "ParameterKey": "LambdaName",
+            "ParameterValue": "getTiAmo"
+        },
+        {
+            "ParameterKey": "LambdaMemorySize",
+            "ParameterValue": "128"
+        },
+        {
+            "ParameterKey": "LambdaRuntime",
+            "ParameterValue": "python3.8"
+        },
+        {
+            "ParameterKey": "GirlName",
+            "ParameterValue": "akane"
+        }
+    ],
+    "Capabilities": [
+        "CAPABILITY_NAMED_IAM"
+    ]
+}

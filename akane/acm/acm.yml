@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: S3 For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+  DomainName:
+    Type: String
+    MinLength: 1
+    MaxLength: 253
+    AllowedPattern: '^(\*\.)?(((?!-)[A-Za-z0-9-]{0,62}[A-Za-z0-9])\.)+((?!-)[A-Za-z0-9-]{1,62}[A-Za-z0-9])$'
+
+
+# Mappings
+
+# Conditions
+
+# Transform
+
+Resources:
+  # 証明書 作成
+  akaneCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-acm
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+      ValidationMethod: DNS
+
+Outputs:
+  akaneCertificate:
+    Value: !Ref akaneCertificate
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-acm
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+
+  akaneDomainName:
+    Value: !Ref DomainName
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-acm-domain
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
