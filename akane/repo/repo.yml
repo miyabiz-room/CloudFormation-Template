@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: ECR For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [dev, stg, prod]
+    ConstraintDescription: must specify dev, stg or prod.
+
+Mappings: 
+  AzMap: 
+    ap-northeast-1:
+      1st: ap-northeast-1a
+      2nd: ap-northeast-1d
+      3rd: ap-northeast-1c
+
+# Conditions
+
+# Transform
+
+Resources:
+  # ECR Repositoryを作成
+  akaneECRRepository:
+    Type: AWS::ECR::Repository
+    Properties: 
+      ImageScanningConfiguration:
+        scanOnPush: true
+      ImageTagMutability: IMMUTABLE
+      LifecyclePolicy: 
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Delete more than 30 images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}'
+      RepositoryName: !Sub
+        - ${SystemName}-${EnvType}-repo
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Tags: 
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-repo
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType 
+
+Outputs:
+  akaneECRRepository:
+    Value: !GetAtt akaneECRRepository.Arn
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-repo-arn
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
