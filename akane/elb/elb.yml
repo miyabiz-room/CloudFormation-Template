@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: ELB For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [dev, stg, prod]
+    ConstraintDescription: must specify dev stg or prod.
+  TargetGroupHealthCheckPath:
+    Type: String
+
+Mappings: 
+  AzMap: 
+    ap-northeast-1:
+      1st: ap-northeast-1a
+      2nd: ap-northeast-1c
+      3nd: ap-northeast-1d
+
+# Conditions
+
+# Transform
+
+Resources:
+  # ELB作成
+  akaneElasticLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: 
+      IpAddressType: ipv4
+      Name: !Sub
+        - ${SystemName}-${EnvType}-elb
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Scheme: internet-facing
+      SecurityGroups: 
+        - Fn::ImportValue: !Sub
+            - ${SystemName}-${EnvType}-sg-elb
+            - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Subnets: 
+        - Fn::ImportValue: !Sub
+          - ${SystemName}-${EnvType}-public-subnet1
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Fn::ImportValue: !Sub
+          - ${SystemName}-${EnvType}-public-subnet2
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Tags: 
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-elb
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+      Type: application
+
+  # TargetGroup作成
+  akaneTargetGroup80:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 15
+      HealthCheckPath: !Ref TargetGroupHealthCheckPath
+      HealthCheckPort: traffic-port
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      Name: !Sub
+        - ${SystemName}-${EnvType}-tg-80
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Port: 80
+      Protocol: HTTP
+      Tags: 
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-tg-80
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+      TargetType: instance
+      UnhealthyThresholdCount: 2
+      VpcId:
+        Fn::ImportValue: !Sub
+          - ${SystemName}-${EnvType}-vpc
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+
+  # ELB リスナー80作成
+  akaneELBListener80:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions: 
+        - Type: forward
+          TargetGroupArn: !Ref akaneTargetGroup80
+      LoadBalancerArn: !Ref akaneElasticLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+Outputs:
+  akaneElasticLoadBalancer:
+    Value: !Ref akaneElasticLoadBalancer
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-elb
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}

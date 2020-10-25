@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: SG For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [dev, stg, prod]
+    ConstraintDescription: must specify dev, stg or prod.
+
+Mappings: 
+  AzMap: 
+    ap-northeast-1:
+      1st: ap-northeast-1a
+      2nd: ap-northeast-1d
+      3rd: ap-northeast-1c
+
+# Conditions
+
+# Transform
+
+Resources:
+  # ELBのSG(セキュリティグループ)作成
+  akaneSecurityGroupELB:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: !Sub
+        - ${SystemName}-${EnvType}-sg-elb
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      GroupName: !Sub
+        - ${SystemName}-${EnvType}-sg-elb
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags: 
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-sg-elb
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+      VpcId:
+        Fn::ImportValue: !Sub
+          - ${SystemName}-${EnvType}-vpc
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+
+Outputs:
+  akaneSecurityGroupELB:
+    Value: !Ref akaneSecurityGroupELB
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-sg-elb
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}

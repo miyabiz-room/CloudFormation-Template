@@ -1,0 +1,20 @@
+{
+    "Parameters": [
+        {
+            "ParameterKey": "SystemName",
+            "ParameterValue": "akane"
+        },
+        {
+            "ParameterKey": "EnvType",
+            "ParameterValue": "dev"
+        },
+        {
+            "ParameterKey": "WAFHeaderName",
+            "ParameterValue": "x-akane-id"
+        },
+        {
+            "ParameterKey": "WAFHeaderToken",
+            "ParameterValue": "4HGVKikFK4EBHHDiBFmW-mKVxHZAt9hTsJyCCXz3M"
+        }
+    ]
+}
