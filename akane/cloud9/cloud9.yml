@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Cloud9 For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [dev, stg, prod]
+    ConstraintDescription: must specify dev, stg or prod.
+  InstanceType:
+    Type: String
+    AllowedPattern: '^[a-z][1-9][.][a-z0-9]+$'
+
+Mappings: 
+  AzMap: 
+    ap-northeast-1:
+      1st: ap-northeast-1a
+      2nd: ap-northeast-1d
+      3rd: ap-northeast-1c
+
+# Conditions
+
+# Transform
+
+Resources:
+  # Cloud9を作成
+  akaneCloud9:
+    Type: AWS::Cloud9::EnvironmentEC2
+    Properties: 
+      AutomaticStopTimeMinutes: 30
+      ConnectionType: CONNECT_SSH
+      Description: !Sub
+        - ${SystemName}-${EnvType}-cloud9
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      InstanceType: !Ref InstanceType
+      Name: !Sub
+        - ${SystemName}-${EnvType}-cloud9
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      SubnetId:
+        Fn::ImportValue: !Sub
+          - ${SystemName}-${EnvType}-public-subnet1
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Tags:
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType   
+
+Outputs:
+  akaneCloud9:
+    Value: !GetAtt akaneCloud9.Arn
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-cloud9-arn
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}

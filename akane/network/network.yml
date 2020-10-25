@@ -1,0 +1,167 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Network For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+  VPCCidrBlock:
+    Type: String
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/16
+  PublicSubnet1:
+    Type: String
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/24
+  PublicSubnet2:
+    Type: String
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/24
+
+Mappings: 
+  AzMap: 
+    ap-northeast-1:
+      1st: ap-northeast-1a
+      2nd: ap-northeast-1c
+      3rd: ap-northeast-1d
+
+# Conditions
+
+# Transform
+
+Resources:
+  # VPC作成
+  akaneVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCidrBlock
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-vpc
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+###########################################################################
+# Publicサブネット関連
+###########################################################################
+  # Publicサブネット作成
+  akanePublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref akaneVPC
+      CidrBlock: !Ref PublicSubnet1
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 1st]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-public-subnet1
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+  akanePublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref akaneVPC
+      CidrBlock: !Ref PublicSubnet2
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 2nd]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-public-subnet2
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+  # インターネットゲートウェイ作成
+  akaneInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-igw
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+  # インターネットゲートウェイをVPCにアタッチ
+  akaneVPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref akaneVPC
+      InternetGatewayId: !Ref akaneInternetGateway
+  # Publicルートテーブル作成
+  akanePublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref akaneVPC
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-public-route
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+  # Publicルートテーブル サブネット関連付け
+  akanePublicSubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref akanePublicSubnet1
+      RouteTableId: !Ref akanePublicRouteTable
+  akanePublicSubnetRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref akanePublicSubnet2
+      RouteTableId: !Ref akanePublicRouteTable
+  # Publicルートテーブル ルートにインターネットゲートウェイを関連付ける
+  akanePublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref akanePublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref akaneInternetGateway
+
+Outputs:
+  akaneVPC:
+    Value: !Ref akaneVPC
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-vpc
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+  akanePublicSubnet1:
+    Value: !Ref akanePublicSubnet1
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-public-subnet1
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+  akanePublicSubnet2:
+    Value: !Ref akanePublicSubnet2
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-public-subnet2
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+  akanePublicRouteTable:
+    Value: !Ref akanePublicRouteTable
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-public-route-table
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}

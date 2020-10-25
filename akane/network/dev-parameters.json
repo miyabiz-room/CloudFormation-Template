@@ -1,0 +1,24 @@
+{
+    "Parameters": [
+        {
+            "ParameterKey": "SystemName",
+            "ParameterValue": "akane"
+        },
+        {
+            "ParameterKey": "EnvType",
+            "ParameterValue": "dev"
+        },
+        {
+            "ParameterKey": "VPCCidrBlock",
+            "ParameterValue": "10.0.0.0/16"
+        },
+        {
+            "ParameterKey": "PublicSubnet1",
+            "ParameterValue": "10.0.0.0/24"
+        },
+        {
+            "ParameterKey": "PublicSubnet2",
+            "ParameterValue": "10.0.1.0/24"
+        }
+    ]
+}
