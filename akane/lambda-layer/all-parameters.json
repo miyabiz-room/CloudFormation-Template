@@ -1,0 +1,24 @@
+{
+    "Parameters": [
+        {
+            "ParameterKey": "SystemName",
+            "ParameterValue": "akane"
+        },
+        {
+            "ParameterKey": "EnvType",
+            "ParameterValue": "all"
+        },
+        {
+            "ParameterKey": "ArtifactS3Bucket",
+            "ParameterValue": "akane-all-s3-artifacts"
+        },
+        {
+            "ParameterKey": "LambdaLayerName",
+            "ParameterValue": "setSlackWebHook"
+        },
+        {
+            "ParameterKey": "CompatibleRuntime1",
+            "ParameterValue": "python3.8"
+        }
+    ]
+}

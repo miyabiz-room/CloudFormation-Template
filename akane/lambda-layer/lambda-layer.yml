@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Lambda Layer For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+  ArtifactS3Bucket:
+    Type: String
+  LambdaLayerName:
+    Type: String
+  CompatibleRuntime1:
+    Type: String
+
+# Mappings
+
+# Conditions
+
+# Transform
+
+Resources:
+  # LambdaLayer 作成
+  akaneLambdaLayerSetSlackWebHook:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      CompatibleRuntimes:
+        - !Ref CompatibleRuntime1
+      Content:
+        S3Bucket: !Ref ArtifactS3Bucket
+        S3Key: !Sub
+          - code-lambda-${LambdaLayerName}.zip
+          - {LambdaLayerName: !Ref LambdaLayerName}
+      Description: !Sub
+        - ${SystemName}-${EnvType}-lambda-layer-${LambdaLayerName}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType, LambdaLayerName: !Ref LambdaLayerName}
+      LayerName: !Ref LambdaLayerName
+      LicenseInfo: MIT
+
+Outputs:
+  akaneLambdaLayerSetSlackWebHook:
+    Value: !Ref akaneLambdaLayerSetSlackWebHook
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-lambda-layer-arn-${LambdaLayerName}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType, LambdaLayerName: !Ref LambdaLayerName}

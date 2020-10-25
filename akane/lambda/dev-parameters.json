@@ -1,0 +1,47 @@
+{
+    "Parameters": [
+        {
+            "ParameterKey": "SystemName",
+            "ParameterValue": "akane"
+        },
+        {
+            "ParameterKey": "EnvType",
+            "ParameterValue": "dev"
+        },
+        {
+            "ParameterKey": "EnvTypeCommon",
+            "ParameterValue": "all"
+        },
+        {
+            "ParameterKey": "ArtifactS3Bucket",
+            "ParameterValue": "akane-all-s3-artifacts"
+        },
+        {
+            "ParameterKey": "LambdaName",
+            "ParameterValue": "getEC2InfoToSlack"
+        },
+        {
+            "ParameterKey": "LambdaMemorySize",
+            "ParameterValue": "128"
+        },
+        {
+            "ParameterKey": "LambdaRuntime",
+            "ParameterValue": "python3.8"
+        },
+        {
+            "ParameterKey": "SlackWebHookUrl",
+            "ParameterValue": "https://hooks.slack.com/services/XXXXXXXXXXX/XXXXXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXX"
+        },
+        {
+            "ParameterKey": "SlackChannel",
+            "ParameterValue": "#test_slack"
+        },
+        {
+            "ParameterKey": "LambdaLayerName",
+            "ParameterValue": "setSlackWebHook"
+        }
+    ],
+    "Capabilities": [
+        "CAPABILITY_NAMED_IAM"
+    ]
+}
