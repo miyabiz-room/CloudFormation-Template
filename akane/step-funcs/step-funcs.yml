@@ -1,0 +1,115 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Step Functions For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+  StepFuncsName:
+    Type: String
+
+# Mappings
+
+# Conditions
+
+# Transform
+
+Resources:
+  akanewaitSecsStepFunctionsStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: !Sub
+        - ${SystemName}-${EnvType}-step-funcs-${StepFuncsName}
+        - { SystemName: !Ref SystemName, EnvType: !Ref EnvType, StepFuncsName: !Ref StepFuncsName }
+      DefinitionString: !Sub
+        - |
+            {
+              "Comment": "${StepFuncsName}",
+              "StartAt": "getLock",
+              "States": {
+                "getLock": {
+                  "Type": "Task",
+                  "Resource": "${LambdaArnToGetLock}",
+                  "ResultPath": "$.getLock",
+                  "Next": "checkLock"
+                },
+                "checkLock": {
+                  "Type" : "Choice",
+                  "Choices": [
+                    {
+                      "Variable": "$.getLock.isSucceededLock",
+                      "NumericEquals": 0,
+                      "Next": "retryWaitToGetLock"
+                    },
+                    {
+                      "Variable": "$.getLock.isSucceededLock",
+                      "NumericEquals": 1,
+                      "Next": "waitSecs"
+                    }
+                  ],
+                  "Default": "retryWaitToGetLock"
+                },
+                "retryWaitToGetLock": {
+                  "Type": "Wait",
+                  "SecondsPath": "$.getLock.retryWaitSecs",
+                  "Next": "getLock"
+                },
+                "waitSecs": {
+                  "Type": "Task",
+                  "Resource": "${LambdaArnToWaitSecs}",
+                  "ResultPath": "$.waitSecs",
+                  "Next": "setLock"
+                },
+                "setLock": {
+                  "Type": "Task",
+                  "Resource": "${LambdaArnToSetLock}",
+                  "ResultPath": "$.setLock",
+                  "End": true
+                }
+              }
+            }
+        - StepFuncsName: !Ref StepFuncsName
+          LambdaArnToWaitSecs:
+            Fn::ImportValue: !Sub
+              - ${SystemName}-${EnvType}-lambda-arn-waitSecs
+              - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+          LambdaArnToGetLock:
+            Fn::ImportValue: !Sub
+              - ${SystemName}-${EnvType}-lambda-arn-getLock
+              - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+          LambdaArnToSetLock:
+            Fn::ImportValue: !Sub
+              - ${SystemName}-${EnvType}-lambda-arn-setLock
+              - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      RoleArn:
+        Fn::ImportValue: !Sub
+          - ${SystemName}-${EnvType}-role-step-funcs-arn-${AWS::Region}
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      StateMachineType: STANDARD
+      LoggingConfiguration:
+        IncludeExecutionData: false
+        Level: 'OFF'
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - ${SystemName}-${EnvType}-step-funcs-${StepFuncsName}
+            - { SystemName: !Ref SystemName, EnvType: !Ref EnvType, StepFuncsName: !Ref StepFuncsName }
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+Outputs:
+  akanewaitSecsStepFunctionsStateMachine:
+    Value: !Ref akanewaitSecsStepFunctionsStateMachine
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-step-funcs-${StepFuncsName}
+        - { SystemName: !Ref SystemName, EnvType: !Ref EnvType, StepFuncsName: !Ref StepFuncsName }

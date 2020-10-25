@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: S3 For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+
+# Mappings
+
+# Conditions
+
+# Transform
+
+Resources:
+  # S3 Bucket作成
+  akaneS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketName: !Sub
+        - ${SystemName}-${EnvType}-s3-artifacts
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-s3-artifacts
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+  # S3 BucketPolicy作成
+  akaneS3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn: akaneS3Bucket
+    Properties:
+      Bucket: !Ref akaneS3Bucket
+      PolicyDocument:
+        Statement:
+          - Action:
+              - s3:GetObject
+            Effect: Allow
+            Resource: !Join
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref akaneS3Bucket
+                - /*
+            Principal:
+              AWS: '*'
+
+Outputs:
+  akaneS3Bucket:
+    Value: !Ref akaneS3Bucket
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-s3-artifacts
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}

@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Lambda For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+  ArtifactS3Bucket:
+    Type: String
+  LambdaName:
+    Type: String
+  LambdaMemorySize:
+    Type: Number
+  LambdaRuntime:
+    Type: String
+  LambdaNameToGetLock:
+    Type: String
+  SQSMessageBody:
+    Type: String
+
+# Mappings
+
+# Conditions
+
+# Transform
+
+Resources:
+  # Lambda作成
+  akaneLambdaSetLock:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Ref ArtifactS3Bucket
+        S3Key: !Sub
+          - code-lambda-${LambdaName}.zip
+          - {LambdaName: !Ref LambdaName}
+      Description: !Sub
+        - ${SystemName}-${EnvType}-lambda-${LambdaName}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType, LambdaName: !Ref LambdaName}
+      Environment:
+        Variables:
+          SQS_QUEUE_NAME:
+            Fn::ImportValue: !Sub
+              - ${SystemName}-${EnvType}-sqs-lock-queue-name
+              - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+          LAMBDA_NAME_TO_GET_LOCK: !Ref LambdaNameToGetLock
+          SQS_MESSAGE_BODY: !Ref SQSMessageBody
+      FunctionName: !Sub
+        - ${SystemName}-${EnvType}-lambda-${LambdaName}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType, LambdaName: !Ref LambdaName}
+      Handler: !Sub
+        - ${LambdaName}.handler
+        - {LambdaName: !Ref LambdaName}
+      MemorySize: !Ref LambdaMemorySize
+      Role:
+        Fn::ImportValue: !Sub
+          - ${SystemName}-${EnvType}-role-lambda-arn-${AWS::Region}
+          - { SystemName: !Ref SystemName, EnvType: !Ref EnvType }
+      Runtime: !Ref LambdaRuntime
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-lambda-${LambdaName}
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+      Timeout: 900
+      TracingConfig:
+        Mode: PassThrough
+
+Outputs:
+  akaneLambdaSetLock:
+    Value: !Ref akaneLambdaSetLock
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-lambda-${LambdaName}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType, LambdaName: !Ref LambdaName}
+
+  akaneLambdaSetLockArn:
+    Value: !GetAtt akaneLambdaSetLock.Arn
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-lambda-arn-${LambdaName}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType, LambdaName: !Ref LambdaName}

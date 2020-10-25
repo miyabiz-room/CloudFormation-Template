@@ -1,0 +1,36 @@
+{
+    "Parameters": [
+        {
+            "ParameterKey": "SystemName",
+            "ParameterValue": "akane"
+        },
+        {
+            "ParameterKey": "EnvType",
+            "ParameterValue": "dev"
+        },
+        {
+            "ParameterKey": "ArtifactS3Bucket",
+            "ParameterValue": "akane-all-s3-artifacts"
+        },
+        {
+            "ParameterKey": "LambdaName",
+            "ParameterValue": "getLock"
+        },
+        {
+            "ParameterKey": "LambdaMemorySize",
+            "ParameterValue": "128"
+        },
+        {
+            "ParameterKey": "LambdaRuntime",
+            "ParameterValue": "python3.8"
+        },
+        {
+            "ParameterKey": "VisibilityTimeout",
+            "ParameterValue": "60"
+        },
+        {
+            "ParameterKey": "RetryWaitSecs",
+            "ParameterValue": "30"
+        }
+    ]
+}

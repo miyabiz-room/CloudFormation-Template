@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: SQS For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+
+# Mappings
+
+# Conditions
+
+# Transform
+
+Resources:
+  akaneSQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      DelaySeconds: 0
+      MaximumMessageSize: 262144
+      MessageRetentionPeriod: 1209600
+      QueueName: !Sub
+        - ${SystemName}-${EnvType}-sqs-lock
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      ReceiveMessageWaitTimeSeconds: 0
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-sqs-lock
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+      VisibilityTimeout: 660
+
+  akaneSQSQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref akaneSQSQueue
+      PolicyDocument:
+        Version: 2012-10-17
+        Id: __default_policy_ID
+        Statement:
+          - Sid: __owner_statement
+            Action: SQS:*
+            Effect: Allow
+            Resource: !GetAtt akaneSQSQueue.Arn
+            Principal:
+              AWS: !Join
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref AWS::AccountId
+                  - ':root'
+          - Sid: __sender_statement
+            Action: SQS:SendMessage
+            Effect: Allow
+            Resource: !GetAtt akaneSQSQueue.Arn
+            Principal:
+              AWS:
+                Fn::ImportValue: !Sub
+                  - ${SystemName}-${EnvType}-role-lambda-arn-${AWS::Region}
+                  - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+          - Sid: __receiver_statement
+            Action:
+              - SQS:ChangeMessageVisibility
+              - SQS:DeleteMessage
+              - SQS:ReceiveMessage
+            Effect: Allow
+            Resource: !GetAtt akaneSQSQueue.Arn
+            Principal:
+              AWS:
+                Fn::ImportValue: !Sub
+                  - ${SystemName}-${EnvType}-role-lambda-arn-${AWS::Region}
+                  - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+
+Outputs:
+  akaneSQSQueueName:
+    Value: !GetAtt akaneSQSQueue.QueueName
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-sqs-lock-queue-name
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}

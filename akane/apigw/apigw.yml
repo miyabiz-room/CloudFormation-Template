@@ -1,0 +1,354 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: API Gateway For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+  EnvTypeCommon:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+  APIGatewayStage:
+    Type: String
+
+# Mappings
+
+# Conditions
+
+# Transform
+
+Resources:
+  # ApiGateway CloudWatchRole 作成
+  akaneCloudWatchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      Description: !Sub
+        - ${SystemName}-${EnvTypeCommon}-role-apigw-cloudwatch-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvTypeCommon: !Ref EnvTypeCommon}
+      ManagedPolicyArns:
+        -  arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+      Path: /
+      RoleName: !Sub
+        - ${SystemName}-${EnvTypeCommon}-role-apigw-cloudwatch-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvTypeCommon: !Ref EnvTypeCommon}
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvTypeCommon}-role-apigw-cloudwatch-${AWS::Region}
+          - {SystemName: !Ref SystemName, EnvTypeCommon: !Ref EnvTypeCommon}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvTypeCommon
+          Value: !Ref EnvTypeCommon
+  akaneApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt akaneCloudWatchRole.Arn
+
+  # ApiGateway 作成
+  akaneApiGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    DependsOn: akaneApiGatewayAccount
+    Properties:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-apigw
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Description: !Sub
+        - ${SystemName}-${EnvType}-apigw
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-apigw
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+  # WaitSecs
+  akaneApiGatewayResourceForWaitSecs:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref akaneApiGatewayRestApi
+      PathPart: 'waitsecs'
+      ParentId: !GetAtt akaneApiGatewayRestApi.RootResourceId
+
+  # WaitSecs: POST
+  akaneApiGatewayMethodPostForWaitSecs:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref akaneApiGatewayRestApi
+      ResourceId: !Ref akaneApiGatewayResourceForWaitSecs
+      HttpMethod: POST
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      RequestParameters: {}
+      RequestModels: {}
+      MethodResponses:
+        - ResponseModels: {}
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '200'
+      Integration:
+        CacheNamespace: !Ref akaneApiGatewayResourceForWaitSecs
+        Credentials:
+          Fn::ImportValue: !Sub
+            - ${SystemName}-${EnvType}-role-apigw-arn-${AWS::Region}
+            - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'POST'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: "{\"taskid\": $input.json('$.executionArn')}"
+            StatusCode: '200'
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        RequestParameters: {}
+        RequestTemplates:
+          application/json: !Sub
+            - |
+              {
+                "input": "$util.escapeJavaScript($input.json('$'))",
+                "stateMachineArn": "${stateMachineArn}"
+              }
+            - stateMachineArn:
+                Fn::ImportValue: !Sub
+                  - ${SystemName}-${EnvType}-step-funcs-waitSecs
+                  - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:states:action/StartExecution
+
+  # Institution: OPTIONS
+  akaneApiGatewayMethodOptionsForWaitSecs:
+    Type: AWS::ApiGateway::Method
+    DependsOn: akaneApiGatewayMethodPostForWaitSecs
+    Properties:
+      RestApiId: !Ref akaneApiGatewayRestApi
+      ResourceId: !Ref akaneApiGatewayResourceForWaitSecs
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      RequestParameters: {}
+      RequestModels: {}
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '200'
+      Integration:
+        CacheNamespace: !Ref akaneApiGatewayResourceForWaitSecs
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates: {}
+            StatusCode: '200'
+        PassthroughBehavior: NEVER
+        RequestParameters: {}
+        RequestTemplates:
+          application/json: "{\"statusCode\": 200}"
+        TimeoutInMillis: 29000
+        Type: MOCK
+
+  # Status
+  akaneApiGatewayResourceForStatus:
+    Type: AWS::ApiGateway::Resource
+    DependsOn: akaneApiGatewayMethodOptionsForWaitSecs
+    Properties:
+      RestApiId: !Ref akaneApiGatewayRestApi
+      PathPart: 'status'
+      ParentId: !GetAtt akaneApiGatewayRestApi.RootResourceId
+
+  # Status: POST
+  akaneApiGatewayMethodPostForStatus:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref akaneApiGatewayRestApi
+      ResourceId: !Ref akaneApiGatewayResourceForStatus
+      HttpMethod: POST
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      RequestParameters:
+        method.request.header.task_id: true
+      RequestModels: {}
+      MethodResponses:
+        - ResponseModels: {}
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '200'
+      Integration:
+        CacheNamespace: !Ref akaneApiGatewayResourceForStatus
+        Credentials:
+          Fn::ImportValue: !Sub
+            - ${SystemName}-${EnvType}-role-apigw-arn-${AWS::Region}
+            - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'POST'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: "{\"status\": $input.json('$.status'), \"result\": $input.json('$.output')}"
+            StatusCode: '200'
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        RequestParameters: {}
+        RequestTemplates:
+          application/json: "{\"executionArn\": $input.json('$.taskid')}"
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:states:action/DescribeExecution
+
+  # Status: OPTIONS
+  akaneApiGatewayMethodOptionsForStatus:
+    Type: AWS::ApiGateway::Method
+    DependsOn: akaneApiGatewayMethodPostForStatus
+    Properties:
+      RestApiId: !Ref akaneApiGatewayRestApi
+      ResourceId: !Ref akaneApiGatewayResourceForStatus
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      RequestParameters: {}
+      RequestModels: {}
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '200'
+      Integration:
+        CacheNamespace: !Ref akaneApiGatewayResourceForStatus
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates: {}
+            StatusCode: '200'
+        PassthroughBehavior: NEVER
+        RequestParameters: {}
+        RequestTemplates:
+          application/json: "{\"statusCode\": 200}"
+        TimeoutInMillis: 29000
+        Type: MOCK
+
+  # ApiGateway Deployment 作成
+  akaneApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: akaneApiGatewayMethodOptionsForStatus
+    Properties:
+      Description: !Sub
+        - ${SystemName}-${EnvType}-apigw-deployment
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      RestApiId: !Ref akaneApiGatewayRestApi
+  akaneApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref akaneApiGatewayDeployment
+      Description: !Sub
+        - ${SystemName}-${EnvType}-apigw-stage
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      MethodSettings:
+        - CacheDataEncrypted: false
+          CachingEnabled: false
+          DataTraceEnabled: true # CloudWatch ログを有効化
+          HttpMethod: '*'
+          LoggingLevel: ERROR
+          MetricsEnabled: false # 詳細 CloudWatch メトリクスを有効化
+          ResourcePath: '/*'
+      RestApiId: !Ref akaneApiGatewayRestApi
+      StageName: !Ref APIGatewayStage
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-apigw-stage
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+      TracingEnabled: false # X-Ray トレースの有効化
+
+  # ApiGateway APIキー 作成
+  akaneApiGatewayKey:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-apigw-key
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Description: !Sub
+        - ${SystemName}-${EnvType}-apigw-key
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Enabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-apigw-key
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+  akaneApiGatewayUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    DependsOn: akaneApiGatewayStage
+    Properties:
+      ApiStages:
+        - ApiId: !Ref akaneApiGatewayRestApi
+          Stage: !Ref APIGatewayStage
+      Description: !Sub
+        - ${SystemName}-${EnvType}-apigw-usage-plan
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      UsagePlanName: !Sub
+        - ${SystemName}-${EnvType}-apigw-usage-plan
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-apigw-usage-plan
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+  akaneApiGatewayUsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref akaneApiGatewayKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref akaneApiGatewayUsagePlan

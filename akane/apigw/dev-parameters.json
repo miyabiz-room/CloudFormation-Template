@@ -1,0 +1,23 @@
+{
+    "Parameters": [
+        {
+            "ParameterKey": "SystemName",
+            "ParameterValue": "akane"
+        },
+        {
+            "ParameterKey": "EnvType",
+            "ParameterValue": "dev"
+        },
+        {
+            "ParameterKey": "EnvTypeCommon",
+            "ParameterValue": "all"
+        },
+        {
+            "ParameterKey": "APIGatewayStage",
+            "ParameterValue": "v1"
+        }
+    ],
+    "Capabilities": [
+        "CAPABILITY_NAMED_IAM"
+    ]
+}

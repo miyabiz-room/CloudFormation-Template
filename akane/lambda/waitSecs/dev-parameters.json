@@ -1,0 +1,28 @@
+{
+    "Parameters": [
+        {
+            "ParameterKey": "SystemName",
+            "ParameterValue": "akane"
+        },
+        {
+            "ParameterKey": "EnvType",
+            "ParameterValue": "dev"
+        },
+        {
+            "ParameterKey": "ArtifactS3Bucket",
+            "ParameterValue": "akane-all-s3-artifacts"
+        },
+        {
+            "ParameterKey": "LambdaName",
+            "ParameterValue": "waitSecs"
+        },
+        {
+            "ParameterKey": "LambdaMemorySize",
+            "ParameterValue": "128"
+        },
+        {
+            "ParameterKey": "LambdaRuntime",
+            "ParameterValue": "python3.8"
+        }
+    ]
+}

@@ -1,0 +1,164 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Role For Akane
+
+# Metadata:
+
+Parameters:
+  SystemName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9-]*'
+  EnvType:
+    Description: Environment type.
+    Type: String
+    AllowedValues: [all, dev, stg, prod]
+    ConstraintDescription: must specify all, dev, stg, or prod.
+
+# Mappings
+
+# Conditions
+
+# Transform
+
+Resources:
+  # Lambda Role 作成
+  akaneRoleForLambda:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub
+        - ${SystemName}-${EnvType}-role-lambda-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Description: !Sub
+        - ${SystemName}-${EnvType}-role-lambda-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      MaxSessionDuration: 3600
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSQSFullAccess
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: '/'
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-role-lambda-${AWS::Region}
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+  # StepFunctions Role 作成
+  akaneRoleForStepFunctions:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub
+        - ${SystemName}-${EnvType}-role-step-funcs-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Description: !Sub
+        - ${SystemName}-${EnvType}-role-step-funcs-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      MaxSessionDuration: 3600
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - !Join
+                  - ''
+                  - - 'states.'
+                    - !Ref AWS::Region
+                    - '.amazonaws.com'
+            Action:
+              - sts:AssumeRole
+      Path: '/'
+      Policies:
+        - PolicyName: LambdaInvokeFunction
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !Join
+                  - ''
+                  - - 'arn:aws:lambda:'
+                    - !Ref AWS::Region
+                    - ':'
+                    - !Ref AWS::AccountId
+                    - ':function:'
+                    - !Ref SystemName
+                    - '-'
+                    - !Ref EnvType
+                    - '-*'
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-role-step-funcs-${AWS::Region}
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+  # ApiGateway Role 作成
+  akaneRoleForApiGateway:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub
+        - ${SystemName}-${EnvType}-role-apigw-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      Description: !Sub
+        - ${SystemName}-${EnvType}-role-apigw-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+      MaxSessionDuration: 3600
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess
+        - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: '/'
+      Tags:
+        - Key: Name
+          Value: !Sub
+          - ${SystemName}-${EnvType}-role-apigw-${AWS::Region}
+          - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+
+Outputs:
+  akaneRoleForLambdaArn:
+    Value: !GetAtt akaneRoleForLambda.Arn
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-role-lambda-arn-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+  akaneRoleForStepFunctionsArn:
+    Value: !GetAtt akaneRoleForStepFunctions.Arn
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-role-step-funcs-arn-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
+  akaneRoleForApiGatewayArn:
+    Value: !GetAtt akaneRoleForApiGateway.Arn
+    Export:
+      Name: !Sub
+        - ${SystemName}-${EnvType}-role-apigw-arn-${AWS::Region}
+        - {SystemName: !Ref SystemName, EnvType: !Ref EnvType}
